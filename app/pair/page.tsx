@@ -8,6 +8,7 @@ import type {
   MatchScore,
   PairRequest,
   SessionType,
+  AvailabilityWindow,
 } from "@/lib/pair-programming/types";
 import Image from "next/image";
 import { getPairProfile, getAllActiveProfiles } from "@/lib/pair-programming/data";
@@ -20,6 +21,16 @@ interface PublicUser {
   displayName: string | null;
   photoURL: string | null;
 }
+
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 export default function PairProgrammingPage() {
   const { user, loading: authLoading } = useAuth();
@@ -414,6 +425,37 @@ function ProfileForm({
   const [newLanguage, setNewLanguage] = useState("");
   const [newFramework, setNewFramework] = useState("");
 
+  const [availability, setAvailability] = useState<AvailabilityWindow[]>(
+    existingProfile?.availability || []
+  );
+  const [newDay, setNewDay] = useState<number>(1);
+  const [newStartTime, setNewStartTime] = useState("09:00");
+  const [newEndTime, setNewEndTime] = useState("17:00");
+  const [windowError, setWindowError] = useState<string | null>(null);
+
+  const handleAddWindow = () => {
+    if (!newStartTime || !newEndTime) return;
+    if (newEndTime <= newStartTime) {
+      setWindowError("End time must be after start time");
+      return;
+    }
+    const isDuplicate = availability.some(
+      (w: AvailabilityWindow) =>
+        w.dayOfWeek === newDay &&
+        w.startTime === newStartTime &&
+        w.endTime === newEndTime
+    );
+    if (isDuplicate) return;
+    setWindowError(null);
+    setAvailability([
+      ...availability,
+      { dayOfWeek: newDay, startTime: newStartTime, endTime: newEndTime },
+    ]);
+    setNewDay(1);
+    setNewStartTime("09:00");
+    setNewEndTime("17:00");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (sessionTypes.length === 0) {
@@ -436,7 +478,7 @@ function ProfileForm({
           preferredLanguages,
           preferredFrameworks,
           timezone,
-          availability: existingProfile?.availability || [],
+          availability,
           sessionTypes,
           bio,
           isActive,
@@ -634,6 +676,88 @@ function ProfileForm({
           <option value="America/Los_Angeles">Pacific Time (PT)</option>
           <option value="UTC">UTC</option>
         </select>
+      </div>
+
+      {/* Availability */}
+      <div>
+        <label className="block text-sm font-medium mb-2">Availability</label>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+          Add your available time windows to improve match quality.
+        </p>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <select
+            aria-label="Day of week"
+            value={newDay}
+            onChange={(e) => setNewDay(Number(e.target.value))}
+            className="px-3 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800"
+          >
+            {DAY_NAMES.map((name, idx) => (
+              <option key={idx} value={idx}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <label htmlFor="avail-start" className="text-sm text-neutral-600 dark:text-neutral-400">
+              From
+            </label>
+            <input
+              id="avail-start"
+              type="time"
+              value={newStartTime}
+              onChange={(e) => setNewStartTime(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              className="px-3 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="avail-end" className="text-sm text-neutral-600 dark:text-neutral-400">
+              To
+            </label>
+            <input
+              id="avail-end"
+              type="time"
+              value={newEndTime}
+              onChange={(e) => setNewEndTime(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              className="px-3 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleAddWindow}
+            className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors"
+          >
+            Add
+          </button>
+        </div>
+        {windowError && (
+          <p className="text-sm text-red-500 mb-2">{windowError}</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {availability.map((window, idx) => (
+            <span
+              key={idx}
+              className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-full text-sm flex items-center gap-2"
+            >
+              {DAY_NAMES[window.dayOfWeek]} {window.startTime}–{window.endTime}
+              <button
+                type="button"
+                onClick={() =>
+                  setAvailability(availability.filter((_, i) => i !== idx))
+                }
+                aria-label={`Remove ${DAY_NAMES[window.dayOfWeek]} ${window.startTime}–${window.endTime}`}
+                className="hover:text-red-500 transition-colors"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Session Types */}
